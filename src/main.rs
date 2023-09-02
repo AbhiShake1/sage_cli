@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fs};
 use std::fs::File;
 use std::process::exit;
 use clap::{arg, Command};
@@ -21,11 +21,20 @@ fn main() {
         Some(root) => root
     };
 
-    let route_file_path = format!("{project_root}/pubspec.yaml");
-    let route_file = File::open(route_file_path).expect("File not found");
+    let route_file_path = format!("{project_root}/lib/base/routing/routes.dart");
+    let route_file = match File::open(&route_file_path) {
+        Ok(path) => path,
+        Err(_) => {
+            eprintln!("route file not found");
+            exit(0)
+        }
+    };
+    let route_code = fs::read_to_string(route_file_path).expect("TODO: panic message");
 
     println!("feature: {:?}", feature);
-    println!("project root path: {project_root}")
+    println!("project root path: {project_root}");
+    println!("route path: {:?}", route_file);
+    println!("route code: {:?}", route_code);
 }
 
 fn find_project_root() -> Option<String> {
