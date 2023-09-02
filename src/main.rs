@@ -5,11 +5,10 @@ fn main() {
         .version("1.0")
         .author("AbhiShake1")
         .about("CLI to interact with the sage project")
-        .arg(arg!(-f --feature <featurename>).required(true))
+        .arg(arg!(-f --feature <featurename> "Name of feature to add").required(true))
         .get_matches();
 
-    println!(
-        "feature: {:?}",
-        matches.get_one::<String>("feature").expect("required")
-    );
+    let feature = matches.get_one::<String>("feature").expect("required");
+
+    println!("feature: {:?}", feature);
 }
