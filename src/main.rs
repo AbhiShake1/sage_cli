@@ -1,4 +1,5 @@
 use std::{env, fs};
+use std::collections::HashSet;
 use std::fs::{create_dir_all, File};
 use std::process::exit;
 
@@ -158,8 +159,13 @@ class {1}Service extends SageService {{
     return Some("Created files".to_string());
 }
 
+// macro_rules! format {
+//     ($($arg:tt)*) => {{
+//         $crate::fmt::format($crate::__export::format_args!($($arg)*));
+//     }}
+// }
 fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<String> {
-    let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}_page.dart';");
+    let import_statement = format!("import 'package:edm/feature/{0}/{0}_page.dart';", feature_name);
     let enum_statement = format!("{feature_name}<{}PageArgs>(),", to_title_case(feature_name));
     let binding = fs::read_to_string(file_path).expect("cant read");
 
@@ -172,7 +178,11 @@ fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<Stri
     new_imports.extend(imports.iter().map(|s| s.to_string()));
     new_imports.sort();
 
-    replace_in_file(file_path, imports.join("\n"), new_imports.join("\n"));
+    replace_in_file(
+        file_path, imports.join("\n"), new_imports
+            .into_iter().collect::<HashSet<_>>()
+            .into_iter().join("\n"),
+    );
 
     let enum_values = get_enum_values(file_path).expect("couldnt find enum");
     let mut new_enum_values = vec![enum_statement];
