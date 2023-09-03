@@ -179,9 +179,12 @@ fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<Stri
     new_imports.sort();
 
     replace_in_file(
-        file_path, imports.join("\n"), new_imports
-            .into_iter().collect::<HashSet<_>>()
-            .into_iter().join("\n"),
+        file_path,
+        imports.join("\n"), new_imports
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter().collect::<Vec<_>>()
+            .join("\n"),
     );
 
     let enum_values = get_enum_values(file_path).expect("couldnt find enum");
