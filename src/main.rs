@@ -159,7 +159,7 @@ class {1}Service extends SageService {{
 }
 
 fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<String> {
-    let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}.dart';");
+    let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}_page.dart';");
     let enum_statement = format!("{feature_name}<{}PageArgs>(),", to_title_case(feature_name));
     let binding = fs::read_to_string(file_path).expect("cant read");
 
