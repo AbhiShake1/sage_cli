@@ -1,6 +1,6 @@
 use std::{env, fs};
-use std::fs::File;
 use std::process::exit;
+
 use clap::{arg, Command};
 
 fn main() {
@@ -22,19 +22,16 @@ fn main() {
     };
 
     let route_file_path = format!("{project_root}/lib/base/routing/routes.dart");
-    let route_file = match File::open(&route_file_path) {
-        Ok(path) => path,
-        Err(_) => {
-            eprintln!("route file not found");
-            exit(0)
-        }
+    // let route_code = fs::read_to_string(route_file_path).expect("TODO: panic message");
+
+    match add_feature_to_route_file(feature, &route_file_path) {
+        None => println!("Failed to add to route file"),
+        Some(_) => println!("Succeeded adding to route file")
     };
-    let route_code = fs::read_to_string(route_file_path).expect("TODO: panic message");
 
     println!("feature: {:?}", feature);
     println!("project root path: {project_root}");
-    println!("route path: {:?}", route_file);
-    println!("route code: {:?}", route_code);
+    // println!("route code: {:?}", route_code);
 }
 
 fn find_project_root() -> Option<String> {
@@ -58,4 +55,40 @@ fn find_project_root() -> Option<String> {
     }
 
     None
+}
+
+fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<String> {
+    let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}.dart';");
+    let binding = fs::read_to_string(file_path).expect("cant read");
+
+    let imports: Vec<_> = binding
+        .lines()
+        .filter(|l| l.starts_with("import "))
+        .collect();
+
+    let previous: Vec<_> = imports.iter().filter(|i| i.contains(&import_statement)).collect();
+
+    if !previous.is_empty() {
+        return None;
+    }
+
+    let mut new_imports = vec![import_statement];
+    new_imports.extend(imports.iter().map(|s| s.to_string()));
+    new_imports.sort();
+
+    replace_in_file(file_path, imports.clone(), new_imports.clone());
+
+    println!("{:?}", imports);
+    println!("{:?}", new_imports);
+    None
+}
+
+fn replace_in_file(file_path: &str, previous_lines: Vec<&str>, new_lines: Vec<String>) -> bool {
+    let bindings = fs::read_to_string(file_path).expect("couldnt read file");
+
+    let new = bindings.replace(&previous_lines.join("\n"), &*new_lines.join("\n"));
+
+    fs::write(file_path, new).expect("couldnt write to file");
+
+    return true;
 }
