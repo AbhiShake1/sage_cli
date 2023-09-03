@@ -1,15 +1,12 @@
-use clap::{arg, Command};
+use clap::arg;
 
-use commands::Commands;
+use commands::{Commands, SageCommand};
 
 mod commands;
 mod utils;
 
 fn main() {
-    let matches = Command::new("Sage CLI")
-        .version("1.0")
-        .author("AbhiShake1")
-        .about("CLI to interact with the sage project")
+    let matches = SageCommand()
         .arg(arg!(-f --feature <featurename> "Name of feature to add").required(true))
         .get_matches();
 
