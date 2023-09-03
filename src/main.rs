@@ -6,7 +6,7 @@ mod commands;
 mod utils;
 
 fn main() {
-    let matches = SageCommand()
+    let matches = SageCommand::new()
         .arg(arg!(-f --feature <featurename> "Name of feature to add").required(true))
         .get_matches();
 
