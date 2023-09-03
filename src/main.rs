@@ -1,4 +1,5 @@
 use std::{env, fs};
+use std::fs::{create_dir_all, File};
 use std::process::exit;
 
 use clap::{arg, Command};
@@ -28,11 +29,16 @@ fn main() {
 
     match add_feature_to_route_file(feature, &route_file_path) {
         None => println!("Failed to add to route file"),
-        Some(_) => println!("Succeeded adding to route file")
+        Some(msg) => println!("{}", msg)
     };
 
-    println!("feature: {:?}", feature);
-    println!("project root path: {project_root}");
+    match add_feature(feature, &project_root) {
+        None => println!("failed to create directories"),
+        Some(msg) => println!("{}", msg),
+    };
+
+    // println!("feature: {:?}", feature);
+    // println!("project root path: {project_root}");
     // println!("route code: {:?}", route_code);
 }
 
@@ -59,6 +65,99 @@ fn find_project_root() -> Option<String> {
     None
 }
 
+fn add_feature(feature_name: &str, root: &str) -> Option<String> {
+    let base = format!("{root}/lib/feature/{feature_name}");
+    let base_data = format!("{base}/data");
+    let base_feature = format!("{base}/{feature_name}");
+    let base_data_feature = format!("{base_data}/{feature_name}");
+    let page = format!("{base_feature}_page.dart");
+    let provider = format!("{base_feature}_provider.dart");
+    let dao = format!("{base_data_feature}_dao.dart");
+    let repo = format!("{base_data_feature}_repo.dart");
+    let service = format!("{base_data_feature}_service.dart");
+
+    let feature = to_title_case(feature_name);
+
+    create_dir_all(base_data).expect("couldnt create base directory");
+
+    File::create(&page).expect("Failed to create page");
+    fs::write(&page, format!(r##"
+import 'package:edm/base/base.dart';
+
+typedef {0}PageArgs = ();
+
+class {0}Page extends SageWidget<{0}PageArgs> {{
+    @override
+    Future<Widget> build(BuildContext context, WidgetRef ref) {{
+        // TODO: implement build
+        throw UnimplementedError();
+    }}
+}}
+
+"##, feature)).expect("Failed to write to page");
+    dart_format(&page);
+
+    File::create(&provider).expect("Failed to create provider");
+    fs::write(&provider, format!(r##"
+import 'package:edm/base/base.dart';
+import 'package:edm/feature/{0}/data/{0}_repo.dart';
+
+final {0}Provider = Provider((ref) => {1}Provider(ref.read({0}RepoProvider)));
+
+class {1}Provider extends SageProvider<{1}Repo> {{
+  {1}Provider(super.ref);
+
+}}
+    "##, feature_name, feature)).expect("Failed to write to provider");
+    dart_format(&provider);
+
+    File::create(&dao).expect("Failed to create dao");
+    fs::write(&dao, format!(r##"
+import 'package:edm/base/base.dart';
+
+final {0}DaoProvider = Provider((_) => {1}Dao());
+
+class {1}Dao extends ModelDaoSet<{1}Model> {{}}
+
+    "##, feature_name, feature)).expect("Failed to write to dao");
+    dart_format(&dao);
+
+    File::create(&repo).expect("Failed to create repo");
+    fs::write(&repo, format!(r##"
+import 'package:edm/base/base.dart';
+import 'package:edm/feature/{0}/data/{0}_dao.dart';
+import 'package:edm/feature/{0}/data/{0}_service.dart';
+
+final {0}RepoProvider = Provider(
+  (ref) => {1}Repo(
+    service: ref.read({0}ServiceProvider),
+    dao: ref.read({0}DaoProvider),
+  ),
+);
+
+class {1}Repo extends SageRepo<{1}Service, {1}Dao> {{
+  {1}Repo({{required super.service, required super.dao}});
+}}
+
+    "##, feature_name, feature)).expect("Failed to write to repo");
+    dart_format(&repo);
+
+    File::create(&service).expect("Failed to create service");
+    fs::write(&service, format!(r##"
+import 'package:edm/base/base.dart';
+
+final {0}ServiceProvider = Provider({1}Service.new);
+
+class {1}Service extends SageService {{
+  {1}Service(super.ref);
+}}
+
+    "##, feature_name, feature)).expect("Failed to write to service");
+    dart_format(&service);
+
+    return Some("Created files".to_string());
+}
+
 fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<String> {
     let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}.dart';");
     let enum_statement = format!("{feature_name}<{}PageArgs>(),", to_title_case(feature_name));
@@ -68,12 +167,6 @@ fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<Stri
         .lines()
         .filter(|l| l.starts_with("import "))
         .collect();
-
-    let previous: Vec<_> = imports.iter().filter(|i| i.contains(&import_statement)).collect();
-
-    if !previous.is_empty() {
-        return None;
-    }
 
     let mut new_imports = vec![import_statement];
     new_imports.extend(imports.iter().map(|s| s.to_string()));
@@ -86,15 +179,11 @@ fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<Stri
     new_enum_values.extend(enum_values.iter().cloned());
     new_enum_values.sort();
 
-    println!("{:?}", new_enum_values);
-
     replace_in_file(file_path, enum_values.join("\n"), new_enum_values.join("\n"));
 
-    println!("{:?}", new_enum_values);
-    println!("{:?}", new_imports);
+    dart_format(file_path);
 
-    std::process::Command::new("dart").arg("format").arg(file_path).output().expect("failed to run dart format");
-    None
+    return Some("Updated routes.dart".to_string());
 }
 
 fn get_enum_values(file_path: &str) -> Result<Vec<String>, std::io::Error> {
@@ -149,4 +238,8 @@ fn to_title_case(input: &str) -> String {
     }
 
     titlecase
+}
+
+fn dart_format(file_path: &str) {
+    std::process::Command::new("dart").arg("format").arg(file_path).output().expect("failed to run dart format");
 }
