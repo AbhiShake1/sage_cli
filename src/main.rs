@@ -3,6 +3,8 @@ use std::process::exit;
 
 use clap::{arg, Command};
 
+use regex::Regex;
+
 fn main() {
     let matches = Command::new("Sage CLI")
         .version("1.0")
@@ -59,6 +61,7 @@ fn find_project_root() -> Option<String> {
 
 fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<String> {
     let import_statement = format!("import 'package:edm/feature/{feature_name}/{feature_name}.dart';");
+    let enum_statement = format!("{feature_name}<{}PageArgs>(),", to_title_case(feature_name));
     let binding = fs::read_to_string(file_path).expect("cant read");
 
     let imports: Vec<_> = binding
@@ -76,19 +79,74 @@ fn add_feature_to_route_file(feature_name: &str, file_path: &str) -> Option<Stri
     new_imports.extend(imports.iter().map(|s| s.to_string()));
     new_imports.sort();
 
-    replace_in_file(file_path, imports.clone(), new_imports.clone());
+    replace_in_file(file_path, imports.join("\n"), new_imports.join("\n"));
 
-    println!("{:?}", imports);
+    let enum_values = get_enum_values(file_path).expect("couldnt find enum");
+    let mut new_enum_values = vec![enum_statement];
+    new_enum_values.extend(enum_values.iter().cloned());
+    new_enum_values.sort();
+
+    println!("{:?}", new_enum_values);
+
+    replace_in_file(file_path, enum_values.join("\n"), new_enum_values.join("\n"));
+
+    println!("{:?}", new_enum_values);
     println!("{:?}", new_imports);
+
+    std::process::Command::new("dart").arg("format").arg(file_path).output().expect("failed to run dart format");
     None
 }
 
-fn replace_in_file(file_path: &str, previous_lines: Vec<&str>, new_lines: Vec<String>) -> bool {
+fn get_enum_values(file_path: &str) -> Result<Vec<String>, std::io::Error> {
+    let re = Regex::new(r"enum\s*\w*\s*<[^>]*>\s*\{([^}]*)\}").unwrap();
+
+    let file_content = fs::read_to_string(file_path)?;
+    let enum_values: Vec<String> = re
+        .captures_iter(&file_content)
+        .flat_map(|captures| {
+            captures.get(1).map(|match_| match_.as_str())
+        })
+        .map(|enum_value| {
+            enum_value
+                .trim()
+                .trim_end_matches(",")
+                .trim_end_matches(";")
+                .split("\n")
+                .collect::<String>()
+                .trim()
+                .to_owned()
+        })
+        .filter(|enum_value| !enum_value.is_empty())
+        .collect();
+
+    Ok(enum_values)
+}
+
+fn replace_in_file(file_path: &str, previous_lines: String, new_lines: String) {
     let bindings = fs::read_to_string(file_path).expect("couldnt read file");
 
-    let new = bindings.replace(&previous_lines.join("\n"), &*new_lines.join("\n"));
+    let new = bindings.replace(&previous_lines, &*new_lines);
 
     fs::write(file_path, new).expect("couldnt write to file");
+}
 
-    return true;
+fn to_title_case(input: &str) -> String {
+    let mut titlecase = String::new();
+    let mut capitalize_next = true;
+
+    for c in input.chars() {
+        if c.is_alphabetic() {
+            if capitalize_next {
+                titlecase.push(c.to_ascii_uppercase());
+                capitalize_next = false;
+            } else {
+                titlecase.push(c.to_ascii_lowercase());
+            }
+        } else {
+            titlecase.push(c);
+            capitalize_next = true;
+        }
+    }
+
+    titlecase
 }
