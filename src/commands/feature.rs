@@ -2,7 +2,9 @@ use std::{env, fs};
 use std::collections::HashSet;
 use std::fs::{create_dir_all, File};
 use std::process::exit;
+
 use regex::Regex;
+
 use crate::utils::{dart_format, to_title_case};
 
 pub fn build_feature(feature: &str) {
